@@ -18,6 +18,44 @@ class Walker
 		this.spots[y][x] = true;
 	}
 
+	CountEmptyBodies(startX, startY, chosenX, chosenY)
+	{
+		const visited = {};
+		const recurseEmpty = (x, y, chosenX, chosenY) =>
+		{
+			visited[`${x}${y}`] = true;
+
+			const neighbors = Walker.allDirOffsets
+				.map(([offsetX, offsetY]) =>
+				{
+					const newX = x + offsetX;
+					const newY = y + offsetY;
+					return [newX, newY];
+				})
+				.filter(([neighborX, neighborY]) =>
+				{
+					if (neighborX === chosenX && neighborY === chosenY) return false;
+					if ((
+						(neighborX < 0 || neighborX >= colCnt) ||
+						(neighborY < 0 || neighborY >= rowCnt))) return false;
+					// console.log(neighborY, neighborX, this.spots[neighborY]?.[neighborX])
+					if (this.spots[neighborY][neighborX]) return false;
+					if (visited[`${neighborX}${neighborY}`]) return false;
+					return true;
+				})
+
+			if (!neighbors.length) return 1;
+			let emptyCnt = 0;
+			for (const spot of neighbors)
+			{
+				emptyCnt += recurseEmpty(...spot, chosenX, chosenY);
+			}
+			return emptyCnt;
+		}
+		recurseEmpty(startX, startY, chosenX, chosenY);
+		return Object.keys(visited).length;
+	}
+
 	walk()
 	{
 		if (this.isComplete) return;
@@ -49,7 +87,36 @@ class Walker
 					if (triedOffsetX === offsetX && triedOffsetY === offsetY) return false;
 				}
 
-				return true;
+				// Check if move splits empty area into two
+				const flatSpotIndex = newY * rowCnt + newX;
+				const numOfEmptySpots = this.spots
+					.flat()
+					.filter((s, i) =>
+					{
+						return !s && i !== flatSpotIndex;
+					})
+					.length;
+				if (!numOfEmptySpots) return true;
+				let emptyX, emptyY;
+				for (let j = 0; j < this.spots.length; j++)
+				{
+					const row = this.spots[j];
+					let breakOut = false;
+					for (let i = 0; i < row.length; i++)
+					{
+						if (!this.spots[j][i] && (i !== newX || j !== newY))
+						{
+							emptyX = i;
+							emptyY = j;
+							breakOut = true;
+							break;
+						}
+					}
+					if (breakOut) break;
+				}
+				const e = this.CountEmptyBodies(emptyX, emptyY, newX, newY);
+				// console.log(e, '===', numOfEmptySpots);
+				return e === numOfEmptySpots;
 			})
 		// console.log('cycle done');
 
@@ -105,8 +172,8 @@ class Walker
 	static allDirOffsets = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 }
 
-const colCnt = 5;
-const rowCnt = 5;
+const colCnt = 10;
+const rowCnt = 10;
 let rowSpace, colSpace;
 let walker;
 let noFire;
