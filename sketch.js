@@ -7,51 +7,83 @@ class Walker
 		this.colCnt = colCnt;
 		this.rowCnt = rowCnt;
 		this.isComplete = false;
-		this.walked = [[x, y]];
+		this.walked = [{
+			pos: [x, y],
+		}];
 		this.spots = Array.from({ length: rowCnt },
-			() => Array.from({ length: colCnt }, () => false)
+			() => Array.from({ length: colCnt }, () => ({
+				visited: false,
+				tried: []
+			}))
 		)
-
-		this.spots[y][x] = true;
+		this.spots[y][x].visited = true;
 	}
 
 	checkIfSpotIsValid(x, y)
 	{
-		return (
+		const c = (
 			(x >= 0 && x < colCnt) &&
 			(y >= 0 && y < rowCnt) &&
-			!this.spots[y][x]);
+			!this.spots[y][x].visited);
+		if (debugMode) console.log(x, y, c);
+		return c;
 	}
 
 	walk()
 	{
 		if (this.isComplete) return;
-		const dirOffSets = Walker.allDirOffsets
-			.filter(([offsetX, offsetY]) =>
-			{
-				const newX = this.x + offsetX;
-				const newY = this.y + offsetY;
-				return this.checkIfSpotIsValid(newX, newY)
-			})
-
-		if (!dirOffSets.length)
+		if (this.walked.length === colCnt * rowCnt)
 		{
 			this.isComplete = true;
 			return;
 		}
 
-		const [offsetX, offsetY] = random(dirOffSets);
-		this.x += offsetX;
-		this.y += offsetY;
-		this.spots[this.y][this.x] = true;
-		this.walked.push([this.x, this.y]);
+		const dirOffSets = Walker.allDirOffsets
+			.filter(([offsetX, offsetY]) =>
+			{
+				const newX = this.x + offsetX;
+				const newY = this.y + offsetY;
+
+				if (!this.checkIfSpotIsValid(newX, newY)) return false;
+				for (const [triedOffsetX, triedOffsetY] of this.spots[this.y][this.x].tried)
+				{
+					if (triedOffsetX === offsetX && triedOffsetY === offsetY) return false;
+				}
+
+				return true;
+			})
+
+		if (!dirOffSets.length)
+		{
+			const { prevPos } = this.walked.pop();
+			if (!prevPos)
+			{
+				this.isComplete = true;
+				return;
+			}
+			this.spots[this.y][this.x].visited = false;
+			[this.x, this.y] = prevPos;
+		}
+		else
+		{
+			const [offsetX, offsetY] = random(dirOffSets);
+			const oldSpot = this.spots[this.y][this.x];
+			oldSpot.tried.push([offsetX, offsetY]);
+			this.walked.push({
+				prevPos: [this.x, this.y],
+				pos: [this.x += offsetX, this.y += offsetY],
+			});
+			const newSpot = this.spots[this.y][this.x];
+			newSpot.visited = true;
+		}
 	}
 
 	drawPath()
 	{
 		let prev;
-		for (const [x, y] of this.walked)
+		for (const { pos } of this.walked)
 		{
+			const [x, y] = pos;
 			const canvasX = x * colSpace;
 			const canvasY = y * rowSpace;
 			if (prev)
@@ -67,17 +99,16 @@ class Walker
 	static allDirOffsets = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 }
 
-const colCnt = 10;
-const rowCnt = 10;
+const colCnt = 5;
+const rowCnt = 5;
 let rowSpace, colSpace;
 let walker;
 function setup()
 {
 	createCanvas(600, 600);
-	// frameRate(10);
 	rowSpace = width / colCnt;
 	colSpace = height / rowCnt;
-	walker = new Walker(floor(colCnt / 2), floor(rowCnt / 2));
+	walker = new Walker(0, 0);
 }
 
 function draw()
@@ -98,6 +129,6 @@ function draw()
 		}
 	}
 
-	walker.walk();
 	walker.drawPath();
+	walker.walk();
 }
