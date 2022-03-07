@@ -49,10 +49,12 @@ class Walker
 			}
 		}
 
-		const visited = {};
+		const visited = {}; // Prevents visiting already visited node
+		let nodeCnt = 0; // Actual node counting
 		const findEmptyBody = (x, y) =>
 		{
-			visited[`${x}${y}`] = true;
+			nodeCnt++;
+			visited[`${x}-${y}`] = true;
 			const neighbors = Walker.allDirOffsets
 				.map(([offsetX, offsetY]) =>
 				{
@@ -66,18 +68,20 @@ class Walker
 						(neighborX < 0 || neighborX >= colCnt) ||
 						(neighborY < 0 || neighborY >= rowCnt))) return false;
 					if (this.spots[neighborY][neighborX]) return false;
-					if (visited[`${neighborX}${neighborY}`]) return false;
 					return true;
 				})
 
 			if (!neighbors.length) return;
 			for (const [nx, ny] of neighbors)
 			{
-				findEmptyBody(nx, ny);
+				if (!visited[`${nx}-${ny}`])
+				{
+					findEmptyBody(nx, ny);
+				}
 			}
 		}
 		findEmptyBody(emptyX, emptyY);
-		return Object.keys(visited).length === numOfEmptySpots;
+		return nodeCnt === numOfEmptySpots;
 	}
 
 	walk()
@@ -169,9 +173,10 @@ class Walker
 	static allDirOffsets = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 }
 
+// Setting col & row counts too high (ie. 100 x 100) causes a recursion error
 const colCnt = 10;
 const rowCnt = 10;
-const repeatCnt = 100;
+const repeatCnt = 1;
 let rowSpace, colSpace;
 let walker;
 let noFire;
@@ -189,17 +194,18 @@ function draw()
 	background(0);
 
 	// Draw spots
-	for (let i = 0; i < colCnt; i++)
-	{
-		for (let j = 0; j < rowCnt; j++)
-		{
-			const x = i * colSpace;
-			const y = j * rowSpace;
+	// for (let i = 0; i < colCnt; i++)
+	// {
+	// 	for (let j = 0; j < rowCnt; j++)
+	// 	{
+	// 		const x = i * colSpace;
+	// 		const y = j * rowSpace;
 
-			fill(255);
-			circle(x, y, 5);
-		}
-	}
+	// 		fill(255);
+	// 		circle(x, y, 5);
+	// 	}
+	// }
+
 	walker.draw();
 	if (!walker.isComplete)
 	{
