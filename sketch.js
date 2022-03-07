@@ -18,13 +18,41 @@ class Walker
 		this.spots[y][x] = true;
 	}
 
-	CountEmptyBodies(startX, startY, chosenX, chosenY)
+	gridIsSplit()
 	{
+		const numOfEmptySpots = this.spots
+			.reduce((acc, row) =>
+			{
+				const rowLen = row
+					.filter(b => !b)
+					.length;
+
+				return acc + rowLen;
+			}, 0);
+
+		// if empty spots is 0, then path is complete
+		if (!numOfEmptySpots) return true;
+
+		// Locate an empty spot
+		let emptyX, emptyY;
+		findEmpty: for (let j = 0; j < this.spots.length; j++)
+		{
+			const row = this.spots[j];
+			for (let i = 0; i < row.length; i++)
+			{
+				if (!this.spots[j][i])
+				{
+					emptyX = i;
+					emptyY = j;
+					break findEmpty;
+				}
+			}
+		}
+
 		const visited = {};
-		const recurseEmpty = (x, y, chosenX, chosenY) =>
+		const findEmptyBody = (x, y) =>
 		{
 			visited[`${x}${y}`] = true;
-
 			const neighbors = Walker.allDirOffsets
 				.map(([offsetX, offsetY]) =>
 				{
@@ -34,36 +62,27 @@ class Walker
 				})
 				.filter(([neighborX, neighborY]) =>
 				{
-					if (neighborX === chosenX && neighborY === chosenY) return false;
 					if ((
 						(neighborX < 0 || neighborX >= colCnt) ||
 						(neighborY < 0 || neighborY >= rowCnt))) return false;
-					// console.log(neighborY, neighborX, this.spots[neighborY]?.[neighborX])
 					if (this.spots[neighborY][neighborX]) return false;
 					if (visited[`${neighborX}${neighborY}`]) return false;
 					return true;
 				})
 
-			if (!neighbors.length) return 1;
-			let emptyCnt = 0;
-			for (const spot of neighbors)
+			if (!neighbors.length) return;
+			for (const [nx, ny] of neighbors)
 			{
-				emptyCnt += recurseEmpty(...spot, chosenX, chosenY);
+				findEmptyBody(nx, ny);
 			}
-			return emptyCnt;
 		}
-		recurseEmpty(startX, startY, chosenX, chosenY);
-		return Object.keys(visited).length;
+		findEmptyBody(emptyX, emptyY);
+		return Object.keys(visited).length === numOfEmptySpots;
 	}
 
 	walk()
 	{
 		if (this.isComplete) return;
-		if (this.walked.length === colCnt * rowCnt)
-		{
-			this.isComplete = true;
-			return;
-		}
 
 		const dirOffSets = Walker.allDirOffsets
 			.filter(([offsetX, offsetY]) =>
@@ -88,37 +107,11 @@ class Walker
 				}
 
 				// Check if move splits empty area into two
-				const flatSpotIndex = newY * rowCnt + newX;
-				const numOfEmptySpots = this.spots
-					.flat()
-					.filter((s, i) =>
-					{
-						return !s && i !== flatSpotIndex;
-					})
-					.length;
-				if (!numOfEmptySpots) return true;
-				let emptyX, emptyY;
-				for (let j = 0; j < this.spots.length; j++)
-				{
-					const row = this.spots[j];
-					let breakOut = false;
-					for (let i = 0; i < row.length; i++)
-					{
-						if (!this.spots[j][i] && (i !== newX || j !== newY))
-						{
-							emptyX = i;
-							emptyY = j;
-							breakOut = true;
-							break;
-						}
-					}
-					if (breakOut) break;
-				}
-				const e = this.CountEmptyBodies(emptyX, emptyY, newX, newY);
-				// console.log(e, '===', numOfEmptySpots);
-				return e === numOfEmptySpots;
+				this.spots[newY][newX] = true;
+				const e = this.gridIsSplit();
+				this.spots[newY][newX] = false;
+				return e;
 			})
-		// console.log('cycle done');
 
 		if (!dirOffSets.length)
 		{
@@ -142,7 +135,11 @@ class Walker
 				tried: [],
 			});
 			this.spots[this.y][this.x] = true;
-			this.head++;
+			if ((++this.head + 1) === colCnt * rowCnt)
+			{
+				this.isComplete = true;
+				return;
+			}
 		}
 	}
 
@@ -174,6 +171,7 @@ class Walker
 
 const colCnt = 10;
 const rowCnt = 10;
+const repeatCnt = 100;
 let rowSpace, colSpace;
 let walker;
 let noFire;
@@ -202,10 +200,14 @@ function draw()
 			circle(x, y, 5);
 		}
 	}
-
-	// Draw walker
 	walker.draw();
-	walker.walk();
+	if (!walker.isComplete)
+	{
+		for (let i = 0; i < repeatCnt; i++)
+		{
+			walker.walk();
+		}
+	}
 	// if (keyIsDown(32))
 	// {
 	// 	if (!noFire) walker.walk();
